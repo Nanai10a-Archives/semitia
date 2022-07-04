@@ -1,6 +1,9 @@
 const BASE = "https://deno.land/std/";
 
 const std = {
+  fmt: {
+    color: await import(BASE + "fmt/colors.ts"),
+  },
   path: await import(BASE + "path/mod.ts"),
 };
 
@@ -30,7 +33,7 @@ Array.prototype.equals = function (another) {
 };
 
 export const inoCache = async (path = "", recursive = true) => {
-  const { join, resolve } = await import("https://deno.land/std/path/mod.ts");
+  const { join, resolve } = std.path;
 
   let record: Record<string, number> = {};
 
@@ -92,25 +95,35 @@ class Watcher {
         this.modifyHandle = "pass";
       }
 
+      const { bold, gray } = std.fmt.color;
+
       console.debug(`  ${path}\t${kind}\t${time}`);
       console.debug(
-        `( ${this.previousPath ?? "undefined\t\t\t"}\t${
-          this.previousKind ?? "undefi"
-        }\t${this.previousTime ?? "undefined"}\t) + ${this.modifyHandle}\t& ${
-          this.momentaryProgress
-        }`
+        gray(
+          `( ${this.previousPath ?? "\t\t\t"}\t${this.previousKind ?? "\t"}\t${
+            this.previousTime ?? "             "
+          }\t) + ${this.modifyHandle}\t& ${
+            this.momentaryProgress === "none"
+              ? "      "
+              : this.momentaryProgress
+          }\t& ${this.momentaryPath}`
+        )
       );
       const detected = this.detect(kind, path, time);
       switch (detected) {
         case "ignore":
+        case "momentary":
           break;
 
-        case "create":
+        case "move":
+          console.debug(
+            bold(`${detected} on ${time} (${this.previousPath} -> ${path})\n`)
+          );
+          break;
+
         case "modify":
         case "remove":
-        case "move":
-        case "momentary":
-          console.debug(`${detected} on ${time}\n`);
+          console.debug(bold(`${detected} on ${time} (${path})\n`));
       }
 
       this.previousKind = kind;
@@ -130,17 +143,31 @@ class Watcher {
   private previousPath: string | undefined = undefined;
 
   private momentaryProgress: "none" | "create" | "modify" = "none";
+  private momentaryPath: string | undefined = undefined;
   private modifyHandle: "pass" | "ignore" = "pass";
+
+  private createTimeout: number | undefined = undefined;
+  private moveTimeout: number | undefined = undefined;
 
   private detect = (kind: Deno.FsEvent["kind"], path: string, time: number) => {
     switch (kind) {
       case "create":
         this.momentaryProgress = "create";
+        this.momentaryPath = path;
         this.modifyHandle = "ignore";
-        return "create";
+        this.createTimeout = setTimeout(() => {
+          this.createTimeout = undefined;
+          this.lazyReturn("create", path, time);
+          this.momentaryProgress = "none";
+          this.momentaryPath = undefined;
+        }, this.THRESHOLD);
+        return "ignore";
 
       case "modify":
-        if (this.momentaryProgress === "create")
+        if (this.momentaryProgress === "modify")
+          this.momentaryProgress = "none";
+
+        if (this.momentaryProgress === "create" && this.momentaryPath === path)
           this.momentaryProgress = "modify";
 
         if (this.modifyHandle === "ignore" && this.inThreshold(time)) {
@@ -149,6 +176,8 @@ class Watcher {
         }
 
         if (this.previousKind === "modify") {
+          clearTimeout(this.moveTimeout);
+          this.moveTimeout = undefined;
           if (this.previousPath === path) {
             return "modify";
           } else {
@@ -156,11 +185,26 @@ class Watcher {
           }
         }
 
+        if (this.momentaryProgress === "none") {
+          this.moveTimeout = setTimeout(() => {
+            this.moveTimeout = undefined;
+            this.lazyReturn("modify", path, time);
+          }, this.THRESHOLD);
+        }
+
         return "ignore";
 
       case "remove":
-        if (this.momentaryProgress === "modify" && this.inThreshold(time)) {
+        if (
+          this.momentaryProgress === "modify" &&
+          this.momentaryPath === path &&
+          this.inThreshold(time)
+        ) {
+          clearTimeout(this.createTimeout);
+          this.createTimeout = undefined;
+
           this.momentaryProgress = "none";
+          this.momentaryPath = undefined;
           return "momentary";
         }
 
@@ -177,6 +221,13 @@ class Watcher {
   private inThreshold = (currentTime: number) =>
     this.previousTime !== undefined &&
     this.previousTime - currentTime <= this.THRESHOLD;
+
+  private lazyReturn = (event: string, path: string, time: number) =>
+    console.debug(
+      std.fmt.color.bold(
+        `${std.fmt.color.italic(event)} on ${time} (${path})\n`
+      )
+    );
 }
 
 // --- --- --- --- --- --- --- --- ---
@@ -238,7 +289,7 @@ const watch = async (path = "", recursive = true) => {
     // new:edt         | c > m
     // new:emp -> edit | c > m | m > .
     // new:edt -> edit | c > m | m > m
-    // edit            | m   m |
+    // edit            | m   . |
 
     if (DETECT_NEW && current.kinds.equals(["create"])) {
       dispatch("new");
