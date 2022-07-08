@@ -8,8 +8,8 @@ const std = {
 };
 
 class Watcher {
-  private target: string;
-  private recursive: boolean;
+  target: string;
+  recursive: boolean;
 
   private fswatcher: Deno.FsWatcher;
   private emitter: AsyncIterableIterator<Deno.FsEvent>;
