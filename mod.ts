@@ -33,7 +33,7 @@ class Watcher {
   watch = async () => {
     let event;
     while ((event = await this.maybeEmit())) {
-      if (event.done === true) throw new Error("emitter reached end of events");
+      if (event.done === true) break;
       if (event.value.paths.length !== 1) continue;
 
       const kind = event.value.kind;
