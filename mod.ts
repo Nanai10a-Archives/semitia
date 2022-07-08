@@ -80,6 +80,8 @@ class Watcher {
       this.previousTime = time;
       this.previousPath = path;
     }
+
+    this.fswatcher.close();
   };
 
   private maybeEmit = () => Promise.race([this.emitter.next(), this.signal]);
