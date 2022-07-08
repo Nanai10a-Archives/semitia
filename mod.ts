@@ -13,7 +13,7 @@ class Watcher {
 
   private fswatcher: Deno.FsWatcher;
   private emitter: AsyncIterableIterator<Deno.FsEvent>;
-  private abort: () => void;
+  public readonly abort: () => void;
   private signal: Promise<null>;
 
   constructor(path = "", recursive = true) {
@@ -30,13 +30,7 @@ class Watcher {
     this.abort = abort!;
   }
 
-  watch = () => {
-    this.loop();
-
-    return this.abort.bind(this);
-  };
-
-  private loop = async () => {
+  watch = async () => {
     let event;
     while ((event = await this.maybeEmit())) {
       if (event.done === true) throw new Error("emitter reached end of events");
