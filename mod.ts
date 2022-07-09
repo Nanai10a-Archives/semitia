@@ -27,7 +27,7 @@ class Logger {
 
 // --- --- --- --- --- --- --- --- ---
 
-class Watcher {
+class Watcher extends EventTarget {
   target: string;
   recursive: boolean;
 
@@ -39,6 +39,8 @@ class Watcher {
   private logger: Logger;
 
   constructor(path = "", recursive = true, mode: Mode = "production") {
+    super();
+
     const target = std.path.resolve(path);
 
     this.target = target;
