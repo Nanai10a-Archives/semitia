@@ -7,6 +7,26 @@ const std = {
   path: await import(BASE + "path/mod.ts"),
 };
 
+type Mode = "development" | "production";
+
+class Logger {
+  public readonly mode: Mode;
+
+  constructor(mode: Mode = "development") {
+    this.mode = mode;
+  }
+
+  dev = (content: string) => {
+    if (this.mode === "development") console.debug(content);
+  };
+
+  pro = (content: string) => {
+    console.log(content);
+  };
+}
+
+// --- --- --- --- --- --- --- --- ---
+
 class Watcher {
   target: string;
   recursive: boolean;
@@ -16,7 +36,9 @@ class Watcher {
   public readonly abort: () => void;
   private signal: Promise<null>;
 
-  constructor(path = "", recursive = true) {
+  private logger: Logger;
+
+  constructor(path = "", recursive = true, mode: Mode = "production") {
     const target = std.path.resolve(path);
 
     this.target = target;
@@ -28,6 +50,8 @@ class Watcher {
     let abort: () => void;
     this.signal = new Promise<null>((resolve) => (abort = () => resolve(null)));
     this.abort = abort!;
+
+    this.logger = new Logger(mode);
   }
 
   watch = async () => {
@@ -47,8 +71,8 @@ class Watcher {
 
       const { bold, gray } = std.fmt.color;
 
-      console.debug(`  ${path}\t${kind}\t${time}`);
-      console.debug(
+      this.logger.dev(`  ${path}\t${kind}\t${time}`);
+      this.logger.dev(
         gray(
           `( ${this.previousPath ?? "\t\t\t"}\t${this.previousKind ?? "\t"}\t${
             this.previousTime ?? "             "
@@ -66,14 +90,14 @@ class Watcher {
           break;
 
         case "move":
-          console.debug(
+          this.logger.pro(
             bold(`${detected} on ${time} (${this.previousPath} -> ${path})\n`)
           );
           break;
 
         case "modify":
         case "remove":
-          console.debug(bold(`${detected} on ${time} (${path})\n`));
+          this.logger.pro(bold(`${detected} on ${time} (${path})\n`));
       }
 
       this.previousKind = kind;
@@ -175,7 +199,7 @@ class Watcher {
     this.previousTime - currentTime <= this.THRESHOLD;
 
   private lazyReturn = (event: string, path: string, time: number) =>
-    console.debug(
+    this.logger.pro(
       std.fmt.color.bold(
         `${std.fmt.color.italic(event)} on ${time} (${path})\n`
       )
