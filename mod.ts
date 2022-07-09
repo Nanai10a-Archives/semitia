@@ -27,6 +27,80 @@ class Logger {
 
 // --- --- --- --- --- --- --- --- ---
 
+type WatchEventParams =
+  | {
+      type: "touch";
+      at: string;
+    }
+  | {
+      type: "new";
+      at: string;
+    }
+  | {
+      type: "move";
+      from: string;
+      to: string;
+    }
+  | {
+      type: "modify";
+      at: string;
+    }
+  | {
+      type: "remove";
+      at: string;
+    };
+
+class WatchEvent extends Event {
+  public readonly content: Readonly<WatchEventParams>;
+
+  constructor(params: WatchEventParams) {
+    super(params.type);
+
+    this.content = params;
+  }
+}
+
+type WatchInternalEventParams =
+  | {
+      type: "ignore";
+      reason:
+        | "initial-create"
+        | "momentary-progress"
+        | "undecidable-modify"
+        | "linux-access"
+        | "unexpected";
+    }
+  | {
+      type: "momentary";
+      at: string;
+    }
+  | {
+      type: "move";
+      from: string;
+      to: string;
+    }
+  | {
+      type: "remove";
+      at: string;
+    }
+  | {
+      type: "create";
+      at: string;
+    }
+  | {
+      type: "modify";
+      at: string;
+    };
+
+class WatchInternalEvent extends Event {
+  public readonly content: Readonly<WatchInternalEventParams>;
+
+  constructor(params: WatchInternalEventParams) {
+    super(params.type);
+    this.content = params;
+  }
+}
+
 class Watcher extends EventTarget {
   target: string;
   recursive: boolean;
@@ -92,6 +166,7 @@ class Watcher extends EventTarget {
           break;
 
         case "move":
+          this.dispatchEvent();
           this.logger.pro(
             bold(`${detected} on ${time} (${this.previousPath} -> ${path})\n`)
           );
