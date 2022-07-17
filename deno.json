@@ -1,6 +1,1 @@
-{
-  "compilerOptions": {
-    "checkJs": true,
-    "lib": ["deno.window"]
-  }
-}
+{}
