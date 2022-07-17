@@ -7,92 +7,41 @@ const std = {
   path: await import(BASE + "path/mod.ts"),
 };
 
-type Mode = "development" | "production";
-
-class Logger {
-  public readonly mode: Mode;
-
-  constructor(mode: Mode = "development") {
-    this.mode = mode;
-  }
-
-  dev = (content: string) => {
-    if (this.mode === "development") console.debug(std.fmt.color.gray(content));
-  };
-
-  pro = (content: string) => {
-    console.log(content);
-  };
-}
-
 // --- --- --- --- --- --- --- --- ---
-
-type WatchEventParams =
-  | {
-    type: "touch";
-    at: string;
-  }
-  | {
-    type: "new";
-    at: string;
-  }
-  | {
-    type: "move";
-    from: string;
-    to: string;
-  }
-  | {
-    type: "modify";
-    at: string;
-  }
-  | {
-    type: "remove";
-    at: string;
-  };
-
-class WatchEvent extends Event {
-  public readonly content: Readonly<WatchEventParams>;
-
-  constructor(params: WatchEventParams) {
-    super(params.type);
-
-    this.content = params;
-  }
-}
 
 type WatchInternalEventParams =
   | {
-    type: "ignore";
-    reason:
-      | "initial-create"
-      | "with-create"
-      | "momentary-progress"
-      | "initial-modify"
-      | "undecidable-modify"
-      | "linux-access"
-      | "unexpected";
-  }
+      type: "ignore";
+      reason:
+        | "initial-create"
+        | "with-create"
+        | "momentary-progress"
+        | "initial-modify"
+        | "undecidable-modify"
+        | "linux-access"
+        | "unexpected";
+    }
   | {
-    type: "momentary";
-    at: string;
-  }
+      type: "momentary";
+      at: string;
+    }
   | {
-    type: "move";
-    from: string;
-    to: string;
-  }
+      type: "move";
+      from: string;
+      to: string;
+    }
   | {
-    type: "remove";
-    at: string;
-  }
+      type: "remove";
+      at: string;
+    }
   | {
-    type: "create";
-    at: string;
-  }
+      type: "create";
+      at: string;
+    }
   | {
-    type: "modify";
-    at: string;
-  };
+      type: "modify";
+      at: string;
+    };
 
 class WatchInternalEvent extends Event {
   public readonly content: Readonly<WatchInternalEventParams>;
@@ -119,7 +68,7 @@ type WatchTimeoutStatus = {
   modify?: number;
 };
 
-class Watcher extends EventTarget {
+class InternalWatcher extends EventTarget {
   target: string;
   recursive: boolean;
 
@@ -128,9 +77,7 @@ class Watcher extends EventTarget {
   public readonly abort: () => void;
   private signal: Promise<null>;
 
-  private logger: Logger;
-
-  constructor(path = "", recursive = true, mode: Mode = "production") {
+  constructor(path = "", recursive = true) {
     super();
 
     const target = std.path.resolve(path);
@@ -144,8 +91,6 @@ class Watcher extends EventTarget {
     let abort: () => void;
     this.signal = new Promise<null>((resolve) => (abort = () => resolve(null)));
     this.abort = abort!;
-
-    this.logger = new Logger(mode);
   }
 
   watch = async () => {
@@ -165,18 +110,7 @@ class Watcher extends EventTarget {
         this.modifyHandle = "pass";
       }
 
-      this.logger.dev(
-        `${this.current.path ?? "\t\t\t"}\t${this.current.kind ?? "\t"}\t${
-          this.current.time ?? "             "
-        }\t + ${this.modifyHandle === "ignore" ? "ignore" : "      "}\t& ${
-          this.momentary === undefined ? "      " : this.momentary?.progress
-        }\t& ${this.momentary?.path ?? ""}`,
-      );
-
       this.detect();
-
-      this.logger.dev(JSON.stringify(this.timeout));
-      this.logger.dev("");
 
       this.previous = this.current;
     }
@@ -186,11 +120,8 @@ class Watcher extends EventTarget {
 
   private maybeEmit = () => Promise.race([this.emitter.next(), this.signal]);
 
-  private dispatch = (params: WatchInternalEventParams) => {
-    this.logger.pro(JSON.stringify(params));
-
+  private dispatch = (params: WatchInternalEventParams) =>
     this.dispatchEvent(new WatchInternalEvent(params));
-  };
 
   // --- --- --- --- --- --- --- --- ---
 
@@ -204,7 +135,7 @@ class Watcher extends EventTarget {
   private timeout: Record<string, WatchTimeoutStatus | undefined> = {};
 
   private detect = () => {
-    if (this.current === undefined) throw new Error();
+    if (this.current === undefined) throw new Error(JSON.stringify(this));
 
     switch (this.current.kind) {
       case "create":
@@ -215,12 +146,12 @@ class Watcher extends EventTarget {
           const path = this.current.path;
           this.timeout[path] = { ...this.timeout[path] };
           this.timeout[path]!.create = setTimeout(() => {
-            if (this.current === undefined) throw new Error();
+            if (this.current === undefined) {
+              throw new Error(JSON.stringify(this));
+            }
             this.timeout[path]!.create = undefined;
             this.dispatch({ type: "create", at: path });
             this.momentary = undefined;
-            this.logger.dev(JSON.stringify(this.timeout));
-            this.logger.dev("");
           }, this.THRESHOLD);
 
           this.dispatch({ type: "ignore", reason: "initial-create" });
@@ -246,7 +177,7 @@ class Watcher extends EventTarget {
 
           if (this.isEqualKinds() && this.isEqualPaths()) {
             if (this.timeout[this.current.path] === undefined) {
-              throw new Error();
+              throw new Error(JSON.stringify(this));
             }
 
             clearTimeout(this.timeout[this.current.path]!.modify);
@@ -258,7 +189,7 @@ class Watcher extends EventTarget {
 
           if (this.isEqualKinds() && !this.isEqualPaths()) {
             if (this.timeout[this.previous!.path] === undefined) {
-              throw new Error();
+              throw new Error(JSON.stringify(this));
             }
 
             clearTimeout(this.timeout[this.previous!.path]!.modify);
@@ -280,12 +211,12 @@ class Watcher extends EventTarget {
           const path = this.current.path;
           this.timeout[path] = { ...this.timeout[path] };
           this.timeout[path]!.modify = setTimeout(() => {
-            if (this.current === undefined) throw new Error();
+            if (this.current === undefined) {
+              throw new Error(JSON.stringify(this));
+            }
 
             this.timeout[path]!.modify = undefined;
             this.dispatch({ type: "modify", at: path });
-            this.logger.dev(JSON.stringify(this.timeout));
-            this.logger.dev("");
           }, this.THRESHOLD);
 
           this.dispatch({ type: "ignore", reason: "initial-modify" });
@@ -314,7 +245,7 @@ class Watcher extends EventTarget {
         break;
 
       default: {
-        throw new Error();
+        throw new Error(JSON.stringify(this));
       }
     }
   };
@@ -349,10 +280,121 @@ class Watcher extends EventTarget {
     this.inThreshold();
 }
 
+type WatchEventParams =
+  | {
+      type: "touch";
+      at: string;
+    }
+  | {
+      type: "new";
+      at: string;
+    }
+  | {
+      type: "move";
+      from: string;
+      to: string;
+    }
+  | {
+      type: "modify";
+      at: string;
+    }
+  | {
+      type: "remove";
+      at: string;
+    };
+
+class WatchEvent extends Event {
+  public readonly content: Readonly<WatchEventParams>;
+
+  constructor(params: WatchEventParams) {
+    super(params.type);
+
+    this.content = params;
+  }
+}
+
+class Watcher extends EventTarget {
+  private internal: InternalWatcher;
+
+  constructor(path = "", recursive = true) {
+    super();
+
+    this.internal = new InternalWatcher(path, recursive);
+
+    this.internal.addEventListener("create", this.handle);
+    this.internal.addEventListener("modify", this.handle);
+    this.internal.addEventListener("move", this.handle);
+    this.internal.addEventListener("remove", this.handle);
+  }
+
+  watch = () => this.internal.watch();
+  abort = () => this.internal.abort();
+
+  private dispatch = (params: WatchEventParams) => {
+    this.dispatchEvent(new WatchEvent(params));
+    console.log(params);
+  };
+
+  private timeout: Record<string, number | undefined> = {};
+  private THRESHOLD = 4;
+
+  private handle = (e: Event) => {
+    if (!(e instanceof WatchInternalEvent)) {
+      throw new Error(JSON.stringify(e));
+    }
+
+    switch (e.content.type) {
+      case "create":
+        {
+          const { at } = e.content;
+
+          this.timeout[at] = setTimeout(() => {
+            this.timeout[at] = undefined;
+            this.dispatch({ type: "touch", at: at });
+          }, this.THRESHOLD);
+        }
+
+        break;
+
+      case "modify":
+        {
+          const { at } = e.content;
+
+          if (this.timeout[at] !== undefined) {
+            clearTimeout(this.timeout[at]);
+            this.timeout[at] = undefined;
+            this.dispatch({ type: "new", at });
+            break;
+          }
+
+          this.dispatch({ type: "modify", at });
+        }
+        break;
+
+      case "move":
+        {
+          const { from, to } = e.content;
+
+          this.dispatch({ type: "move", from, to });
+        }
+        break;
+
+      case "remove":
+        {
+          const { at } = e.content;
+
+          this.dispatch({ type: "remove", at });
+        }
+        break;
+
+      default: {
+        throw new Error(JSON.stringify(e));
+      }
+    }
+  };
+}
+
 if (import.meta.main) {
-  const mode = Deno.args.find((s) => s === "-D") ? "development" : "production";
-
-  const w = new Watcher(undefined, undefined, mode);
-
+  const w = new Watcher();
   w.watch();
 }
