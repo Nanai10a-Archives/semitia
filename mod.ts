@@ -105,9 +105,16 @@ class InternalWatcher extends EventTarget {
         time: new Date().getTime(),
       };
 
-      if (!this.inThreshold()) {
-        this.momentary = undefined;
-        this.modifyHandle = "pass";
+      for (const [k, v] of Object.entries(this.timeout)) {
+        if (Object.entries(v!).length === 0) {
+          delete this.timeout[k];
+        }
+      }
+
+      for (const [k, v] of Object.entries(this.modifyHandle)) {
+        if (!this.inThreshold(v!)) {
+          delete this.modifyHandle[k];
+        }
       }
 
       this.detect();
@@ -127,150 +134,137 @@ class InternalWatcher extends EventTarget {
 
   private THRESHOLD = 4;
 
-  private current?: WatchStatus;
-  private previous?: WatchStatus;
+  private current: WatchStatus | null = null;
+  private previous: WatchStatus | null = null;
 
-  private momentary?: WatchMomentaryStatus = undefined;
-  private modifyHandle: "pass" | "ignore" = "pass";
-  private timeout: Record<string, WatchTimeoutStatus | undefined> = {};
+  private momentary: WatchMomentaryStatus | null = null;
+  private modifyHandle: Record<string, number> = {};
+  private timeout: Record<string, WatchTimeoutStatus> = {};
 
   private detect = () => {
-    if (this.current === undefined) throw new Error(JSON.stringify(this));
+    if (this.current === null) throw new Error(JSON.stringify(this));
+    console.log(JSON.stringify(this, undefined, 2));
+
+    const { path } = this.current;
 
     switch (this.current.kind) {
       case "create":
-        {
-          this.momentary = { progress: "create", path: this.current.path };
-          this.modifyHandle = "ignore";
+        this.momentary = { progress: "create", path };
+        delete this.modifyHandle[path];
 
-          const path = this.current.path;
-          this.timeout[path] = { ...this.timeout[path] };
-          this.timeout[path]!.create = setTimeout(() => {
-            if (this.current === undefined) {
-              throw new Error(JSON.stringify(this));
-            }
-            this.timeout[path]!.create = undefined;
-            this.dispatch({ type: "create", at: path });
-            this.momentary = undefined;
-          }, this.THRESHOLD);
+        this.timeout[path] = { ...this.timeout[path] };
+        this.timeout[path].create = setTimeout(() => {
+          delete this.timeout[path].create;
+          this.dispatch({ type: "create", at: path });
+          this.momentary = null;
+        }, this.THRESHOLD);
 
-          this.dispatch({ type: "ignore", reason: "initial-create" });
-        }
+        this.dispatch({ type: "ignore", reason: "initial-create" });
+
         break;
 
       case "modify":
-        {
-          if (this.inMomentaryProgress()) {
-            this.momentary = {
-              progress: "modify",
-              path: this.current.path,
-            };
+        if (this.inMomentaryProgress()) {
+          this.momentary = { progress: "modify", path };
 
-            this.dispatch({ type: "ignore", reason: "momentary-progress" });
-          }
-
-          if (this.inModifyIgnoring()) {
-            this.modifyHandle = "pass";
-            this.dispatch({ type: "ignore", reason: "with-create" });
-            break;
-          }
-
-          if (this.isEqualKinds() && this.isEqualPaths()) {
-            if (this.timeout[this.current.path] === undefined) {
-              throw new Error(JSON.stringify(this));
-            }
-
-            clearTimeout(this.timeout[this.current.path]!.modify);
-            this.timeout[this.current.path]!.modify = undefined;
-
-            this.dispatch({ type: "modify", at: this.current.path });
-            break;
-          }
-
-          if (this.isEqualKinds() && !this.isEqualPaths()) {
-            if (this.timeout[this.previous!.path] === undefined) {
-              throw new Error(JSON.stringify(this));
-            }
-
-            clearTimeout(this.timeout[this.previous!.path]!.modify);
-            this.timeout[this.previous!.path]!.modify = undefined;
-
-            this.dispatch({
-              type: "move",
-              from: this.previous!.path,
-              to: this.current.path,
-            });
-            break;
-          }
-
-          if (this.timeout[this.current.path]?.create !== undefined) {
-            this.dispatch({ type: "ignore", reason: "with-create" });
-            break;
-          }
-
-          const path = this.current.path;
-          this.timeout[path] = { ...this.timeout[path] };
-          this.timeout[path]!.modify = setTimeout(() => {
-            if (this.current === undefined) {
-              throw new Error(JSON.stringify(this));
-            }
-
-            this.timeout[path]!.modify = undefined;
-            this.dispatch({ type: "modify", at: path });
-          }, this.THRESHOLD);
-
-          this.dispatch({ type: "ignore", reason: "initial-modify" });
+          this.dispatch({ type: "ignore", reason: "momentary-progress" });
         }
+
+        if (this.inModifyIgnoring()) {
+          delete this.modifyHandle[path];
+          this.dispatch({ type: "ignore", reason: "with-create" });
+          break;
+        }
+
+        if (
+          this.isEqualKinds() &&
+          this.isEqualPaths() &&
+          this.timeout[path] !== undefined
+        ) {
+          clearTimeout(this.timeout[path].modify);
+          delete this.timeout[path].modify;
+
+          this.dispatch({ type: "modify", at: path });
+          break;
+        }
+
+        if (
+          this.isEqualKinds() &&
+          !this.isEqualPaths() &&
+          this.previous !== null &&
+          this.timeout[this.previous.path] !== undefined
+        ) {
+          clearTimeout(this.timeout[this.previous.path].modify);
+          delete this.timeout[this.previous.path].modify;
+
+          this.dispatch({ type: "move", from: this.previous.path, to: path });
+          break;
+        }
+
+        if (this.timeout[path]?.create !== undefined) {
+          this.dispatch({ type: "ignore", reason: "with-create" });
+          break;
+        }
+
+        this.timeout[path] = { ...this.timeout[path] };
+        this.timeout[path].modify = setTimeout(() => {
+          delete this.timeout[path].modify;
+          this.dispatch({ type: "modify", at: path });
+        }, this.THRESHOLD);
+
+        this.dispatch({ type: "ignore", reason: "initial-modify" });
+
         break;
 
       case "remove":
-        {
-          if (this.inMomentaryProgress()) {
-            clearTimeout(this.timeout[this.current.path]!.create);
-            this.timeout[this.current.path]!.create = undefined;
+        if (this.inMomentaryProgress()) {
+          clearTimeout(this.timeout[path].create);
+          delete this.timeout[path].create;
 
-            this.momentary = undefined;
-            this.dispatch({ type: "momentary", at: this.current.path });
-            break;
-          }
-
-          this.dispatch({ type: "remove", at: this.current.path });
+          this.momentary = null;
+          this.dispatch({ type: "momentary", at: path });
+          break;
         }
+
+        this.dispatch({ type: "remove", at: path });
+
         break;
 
       case "access":
-        {
-          this.dispatch({ type: "ignore", reason: "linux-access" });
-        }
+        this.dispatch({ type: "ignore", reason: "linux-access" });
+
         break;
 
-      default: {
+      default:
         throw new Error(JSON.stringify(this));
-      }
     }
   };
 
   private isEqualPaths = () =>
-    this.previous !== undefined &&
-    this.current !== undefined &&
+    this.previous !== null &&
+    this.current !== null &&
     this.previous.path === this.current!.path;
 
   private isEqualKinds = () =>
-    this.previous !== undefined &&
-    this.current !== undefined &&
+    this.previous !== null &&
+    this.current !== null &&
     this.previous.kind === this.current.kind;
 
-  private inThreshold = () =>
-    this.previous !== undefined &&
-    this.current !== undefined &&
-    this.previous.time - this.current.time <= this.THRESHOLD;
+  private inThreshold = (target?: number) =>
+    target !== undefined && this.current !== null
+      ? target - this.current.time <= this.THRESHOLD
+      : this.previous !== null && this.current !== null
+      ? this.previous.time - this.current.time <= this.THRESHOLD
+      : false;
 
   private inModifyIgnoring = () =>
-    this.modifyHandle === "ignore" && this.inThreshold();
+    this.current !== null &&
+    this.modifyHandle[this.current.path] !== undefined &&
+    this.inThreshold(this.modifyHandle[this.current.path]);
 
   private inMomentaryProgress = () =>
-    this.current !== undefined &&
-    this.momentary !== undefined &&
+    this.current !== null &&
+    this.momentary !== null &&
     (this.momentary.progress === "create"
       ? this.current.kind === "modify"
       : this.momentary.progress === "modify"
@@ -343,48 +337,42 @@ class Watcher extends EventTarget {
       throw new Error(JSON.stringify(e));
     }
 
-    switch (e.content.type) {
-      case "create":
-        {
-          const { at } = e.content;
+    const { type, at, from, to } = {
+      at: undefined,
+      from: undefined,
+      to: undefined,
+      ...e.content,
+    };
 
-          this.timeout[at] = setTimeout(() => {
-            this.timeout[at] = undefined;
-            this.dispatch({ type: "touch", at: at });
-          }, this.THRESHOLD);
-        }
+    switch (type) {
+      case "create":
+        this.timeout[at] = setTimeout(() => {
+          this.timeout[at] = undefined;
+          this.dispatch({ type: "touch", at });
+        }, this.THRESHOLD);
 
         break;
 
       case "modify":
-        {
-          const { at } = e.content;
-
-          if (this.timeout[at] !== undefined) {
-            clearTimeout(this.timeout[at]);
-            this.timeout[at] = undefined;
-            this.dispatch({ type: "new", at });
-            break;
-          }
-
-          this.dispatch({ type: "modify", at });
+        if (this.timeout[at] !== undefined) {
+          clearTimeout(this.timeout[at]);
+          this.timeout[at] = undefined;
+          this.dispatch({ type: "new", at });
+          break;
         }
+
+        this.dispatch({ type: "modify", at });
+
         break;
 
       case "move":
-        {
-          const { from, to } = e.content;
+        this.dispatch({ type: "move", from, to });
 
-          this.dispatch({ type: "move", from, to });
-        }
         break;
 
       case "remove":
-        {
-          const { at } = e.content;
+        this.dispatch({ type: "remove", at });
 
-          this.dispatch({ type: "remove", at });
-        }
         break;
 
       default: {
