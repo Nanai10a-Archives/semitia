@@ -19,10 +19,10 @@ const main = async (args: string[]) => {
       required: true,
     })
     .option("-a, --all", "unignore `.dot` and `temp~` files.")
-    .arguments("<dirs...:string>")
+    .arguments("[dirs...:string]")
     .parse(args);
 
-  const paths = [...result.args[0], ...result.literal];
+  const paths = [...(result.args?.[0] ?? [""]), ...result.literal];
   const opts = result.options;
 
   const execute = [] as string[];
