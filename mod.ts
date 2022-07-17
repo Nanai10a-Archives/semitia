@@ -17,7 +17,7 @@ class Logger {
   }
 
   dev = (content: string) => {
-    if (this.mode === "development") console.debug(content);
+    if (this.mode === "development") console.debug(std.fmt.color.gray(content));
   };
 
   pro = (content: string) => {
@@ -29,26 +29,26 @@ class Logger {
 
 type WatchEventParams =
   | {
-      type: "touch";
-      at: string;
-    }
+    type: "touch";
+    at: string;
+  }
   | {
-      type: "new";
-      at: string;
-    }
+    type: "new";
+    at: string;
+  }
   | {
-      type: "move";
-      from: string;
-      to: string;
-    }
+    type: "move";
+    from: string;
+    to: string;
+  }
   | {
-      type: "modify";
-      at: string;
-    }
+    type: "modify";
+    at: string;
+  }
   | {
-      type: "remove";
-      at: string;
-    };
+    type: "remove";
+    at: string;
+  };
 
 class WatchEvent extends Event {
   public readonly content: Readonly<WatchEventParams>;
@@ -62,35 +62,37 @@ class WatchEvent extends Event {
 
 type WatchInternalEventParams =
   | {
-      type: "ignore";
-      reason:
-        | "initial-create"
-        | "momentary-progress"
-        | "undecidable-modify"
-        | "linux-access"
-        | "unexpected";
-    }
+    type: "ignore";
+    reason:
+      | "initial-create"
+      | "with-create"
+      | "momentary-progress"
+      | "initial-modify"
+      | "undecidable-modify"
+      | "linux-access"
+      | "unexpected";
+  }
   | {
-      type: "momentary";
-      at: string;
-    }
+    type: "momentary";
+    at: string;
+  }
   | {
-      type: "move";
-      from: string;
-      to: string;
-    }
+    type: "move";
+    from: string;
+    to: string;
+  }
   | {
-      type: "remove";
-      at: string;
-    }
+    type: "remove";
+    at: string;
+  }
   | {
-      type: "create";
-      at: string;
-    }
+    type: "create";
+    at: string;
+  }
   | {
-      type: "modify";
-      at: string;
-    };
+    type: "modify";
+    at: string;
+  };
 
 class WatchInternalEvent extends Event {
   public readonly content: Readonly<WatchInternalEventParams>;
@@ -100,6 +102,22 @@ class WatchInternalEvent extends Event {
     this.content = params;
   }
 }
+
+type WatchStatus = {
+  kind: Deno.FsEvent["kind"];
+  time: number;
+  path: string;
+};
+
+type WatchMomentaryStatus = {
+  progress: "create" | "modify";
+  path: string;
+};
+
+type WatchTimeoutStatus = {
+  create?: number;
+  modify?: number;
+};
 
 class Watcher extends EventTarget {
   target: string;
@@ -136,50 +154,31 @@ class Watcher extends EventTarget {
       if (event.done === true) break;
       if (event.value.paths.length !== 1) continue;
 
-      const kind = event.value.kind;
-      const path = event.value.paths[0];
-      const time = new Date().getTime();
+      this.current = {
+        kind: event.value.kind,
+        path: event.value.paths[0],
+        time: new Date().getTime(),
+      };
 
-      if (!this.inThreshold(time)) {
-        this.momentaryProgress = "none";
+      if (!this.inThreshold()) {
+        this.momentary = undefined;
         this.modifyHandle = "pass";
       }
 
-      const { bold, gray } = std.fmt.color;
-
-      this.logger.dev(`  ${path}\t${kind}\t${time}`);
       this.logger.dev(
-        gray(
-          `( ${this.previousPath ?? "\t\t\t"}\t${this.previousKind ?? "\t"}\t${
-            this.previousTime ?? "             "
-          }\t) + ${this.modifyHandle}\t& ${
-            this.momentaryProgress === "none"
-              ? "      "
-              : this.momentaryProgress
-          }\t& ${this.momentaryPath}`
-        )
+        `${this.current.path ?? "\t\t\t"}\t${this.current.kind ?? "\t"}\t${
+          this.current.time ?? "             "
+        }\t + ${this.modifyHandle === "ignore" ? "ignore" : "      "}\t& ${
+          this.momentary === undefined ? "      " : this.momentary?.progress
+        }\t& ${this.momentary?.path ?? ""}`,
       );
-      const detected = this.detect(kind, path, time);
-      switch (detected) {
-        case "ignore":
-        case "momentary":
-          break;
 
-        case "move":
-          this.dispatchEvent();
-          this.logger.pro(
-            bold(`${detected} on ${time} (${this.previousPath} -> ${path})\n`)
-          );
-          break;
+      this.detect();
 
-        case "modify":
-        case "remove":
-          this.logger.pro(bold(`${detected} on ${time} (${path})\n`));
-      }
+      this.logger.dev(JSON.stringify(this.timeout));
+      this.logger.dev("");
 
-      this.previousKind = kind;
-      this.previousTime = time;
-      this.previousPath = path;
+      this.previous = this.current;
     }
 
     this.fswatcher.close();
@@ -187,103 +186,173 @@ class Watcher extends EventTarget {
 
   private maybeEmit = () => Promise.race([this.emitter.next(), this.signal]);
 
+  private dispatch = (params: WatchInternalEventParams) => {
+    this.logger.pro(JSON.stringify(params));
+
+    this.dispatchEvent(new WatchInternalEvent(params));
+  };
+
   // --- --- --- --- --- --- --- --- ---
 
   private THRESHOLD = 4;
 
-  private previousKind: string | undefined = undefined;
-  private previousTime: number | undefined = undefined;
-  private previousPath: string | undefined = undefined;
+  private current?: WatchStatus;
+  private previous?: WatchStatus;
 
-  private momentaryProgress: "none" | "create" | "modify" = "none";
-  private momentaryPath: string | undefined = undefined;
+  private momentary?: WatchMomentaryStatus = undefined;
   private modifyHandle: "pass" | "ignore" = "pass";
+  private timeout: Record<string, WatchTimeoutStatus | undefined> = {};
 
-  private createTimeout: number | undefined = undefined;
-  private moveTimeout: number | undefined = undefined;
+  private detect = () => {
+    if (this.current === undefined) throw new Error();
 
-  private detect = (kind: Deno.FsEvent["kind"], path: string, time: number) => {
-    switch (kind) {
+    switch (this.current.kind) {
       case "create":
-        this.momentaryProgress = "create";
-        this.momentaryPath = path;
-        this.modifyHandle = "ignore";
-        this.createTimeout = setTimeout(() => {
-          this.createTimeout = undefined;
-          this.lazyReturn("create", path, time);
-          this.momentaryProgress = "none";
-          this.momentaryPath = undefined;
-        }, this.THRESHOLD);
-        return "ignore";
+        {
+          this.momentary = { progress: "create", path: this.current.path };
+          this.modifyHandle = "ignore";
+
+          const path = this.current.path;
+          this.timeout[path] = { ...this.timeout[path] };
+          this.timeout[path]!.create = setTimeout(() => {
+            if (this.current === undefined) throw new Error();
+            this.timeout[path]!.create = undefined;
+            this.dispatch({ type: "create", at: path });
+            this.momentary = undefined;
+            this.logger.dev(JSON.stringify(this.timeout));
+            this.logger.dev("");
+          }, this.THRESHOLD);
+
+          this.dispatch({ type: "ignore", reason: "initial-create" });
+        }
+        break;
 
       case "modify":
-        if (this.momentaryProgress === "modify")
-          this.momentaryProgress = "none";
+        {
+          if (this.inMomentaryProgress()) {
+            this.momentary = {
+              progress: "modify",
+              path: this.current.path,
+            };
 
-        if (this.momentaryProgress === "create" && this.momentaryPath === path)
-          this.momentaryProgress = "modify";
-
-        if (this.modifyHandle === "ignore" && this.inThreshold(time)) {
-          this.modifyHandle = "pass";
-          return "ignore";
-        }
-
-        if (this.previousKind === "modify") {
-          clearTimeout(this.moveTimeout);
-          this.moveTimeout = undefined;
-          if (this.previousPath === path) {
-            return "modify";
-          } else {
-            return "move";
+            this.dispatch({ type: "ignore", reason: "momentary-progress" });
           }
-        }
 
-        if (this.momentaryProgress === "none") {
-          this.moveTimeout = setTimeout(() => {
-            this.moveTimeout = undefined;
-            this.lazyReturn("modify", path, time);
+          if (this.inModifyIgnoring()) {
+            this.modifyHandle = "pass";
+            this.dispatch({ type: "ignore", reason: "with-create" });
+            break;
+          }
+
+          if (this.isEqualKinds() && this.isEqualPaths()) {
+            if (this.timeout[this.current.path] === undefined) {
+              throw new Error();
+            }
+
+            clearTimeout(this.timeout[this.current.path]!.modify);
+            this.timeout[this.current.path]!.modify = undefined;
+
+            this.dispatch({ type: "modify", at: this.current.path });
+            break;
+          }
+
+          if (this.isEqualKinds() && !this.isEqualPaths()) {
+            if (this.timeout[this.previous!.path] === undefined) {
+              throw new Error();
+            }
+
+            clearTimeout(this.timeout[this.previous!.path]!.modify);
+            this.timeout[this.previous!.path]!.modify = undefined;
+
+            this.dispatch({
+              type: "move",
+              from: this.previous!.path,
+              to: this.current.path,
+            });
+            break;
+          }
+
+          if (this.timeout[this.current.path]?.create !== undefined) {
+            this.dispatch({ type: "ignore", reason: "with-create" });
+            break;
+          }
+
+          const path = this.current.path;
+          this.timeout[path] = { ...this.timeout[path] };
+          this.timeout[path]!.modify = setTimeout(() => {
+            if (this.current === undefined) throw new Error();
+
+            this.timeout[path]!.modify = undefined;
+            this.dispatch({ type: "modify", at: path });
+            this.logger.dev(JSON.stringify(this.timeout));
+            this.logger.dev("");
           }, this.THRESHOLD);
-        }
 
-        return "ignore";
+          this.dispatch({ type: "ignore", reason: "initial-modify" });
+        }
+        break;
 
       case "remove":
-        if (
-          this.momentaryProgress === "modify" &&
-          this.momentaryPath === path &&
-          this.inThreshold(time)
-        ) {
-          clearTimeout(this.createTimeout);
-          this.createTimeout = undefined;
+        {
+          if (this.inMomentaryProgress()) {
+            clearTimeout(this.timeout[this.current.path]!.create);
+            this.timeout[this.current.path]!.create = undefined;
 
-          this.momentaryProgress = "none";
-          this.momentaryPath = undefined;
-          return "momentary";
+            this.momentary = undefined;
+            this.dispatch({ type: "momentary", at: this.current.path });
+            break;
+          }
+
+          this.dispatch({ type: "remove", at: this.current.path });
         }
-
-        return "remove";
+        break;
 
       case "access":
-        return "ignore";
+        {
+          this.dispatch({ type: "ignore", reason: "linux-access" });
+        }
+        break;
 
-      default:
-        throw new Error("unexpected kind of event");
+      default: {
+        throw new Error();
+      }
     }
   };
 
-  private inThreshold = (currentTime: number) =>
-    this.previousTime !== undefined &&
-    this.previousTime - currentTime <= this.THRESHOLD;
+  private isEqualPaths = () =>
+    this.previous !== undefined &&
+    this.current !== undefined &&
+    this.previous.path === this.current!.path;
 
-  private lazyReturn = (event: string, path: string, time: number) =>
-    this.logger.pro(
-      std.fmt.color.bold(
-        `${std.fmt.color.italic(event)} on ${time} (${path})\n`
-      )
-    );
+  private isEqualKinds = () =>
+    this.previous !== undefined &&
+    this.current !== undefined &&
+    this.previous.kind === this.current.kind;
+
+  private inThreshold = () =>
+    this.previous !== undefined &&
+    this.current !== undefined &&
+    this.previous.time - this.current.time <= this.THRESHOLD;
+
+  private inModifyIgnoring = () =>
+    this.modifyHandle === "ignore" && this.inThreshold();
+
+  private inMomentaryProgress = () =>
+    this.current !== undefined &&
+    this.momentary !== undefined &&
+    (this.momentary.progress === "create"
+      ? this.current.kind === "modify"
+      : this.momentary.progress === "modify"
+      ? this.current.kind === "remove"
+      : false) &&
+    this.momentary.path === this.current.path &&
+    this.inThreshold();
 }
 
 if (import.meta.main) {
-  const w = new Watcher();
+  const mode = Deno.args.find((s) => s === "-D") ? "development" : "production";
+
+  const w = new Watcher(undefined, undefined, mode);
+
   w.watch();
 }
