@@ -142,8 +142,7 @@ class InternalWatcher extends EventTarget {
   private timeout: Record<string, WatchTimeoutStatus> = {};
 
   private detect = () => {
-    if (this.current === null) throw new Error(JSON.stringify(this));
-    console.log(JSON.stringify(this, undefined, 2));
+    if (this.current === null) throw new Error(`${this}`);
 
     const { path } = this.current;
 
@@ -236,7 +235,7 @@ class InternalWatcher extends EventTarget {
         break;
 
       default:
-        throw new Error(JSON.stringify(this));
+        throw new Error(`${this}`);
     }
   };
 
@@ -326,7 +325,6 @@ class Watcher extends EventTarget {
 
   private dispatch = (params: WatchEventParams) => {
     this.dispatchEvent(new WatchEvent(params));
-    console.log(params);
   };
 
   private timeout: Record<string, number | undefined> = {};
@@ -334,7 +332,7 @@ class Watcher extends EventTarget {
 
   private handle = (e: Event) => {
     if (!(e instanceof WatchInternalEvent)) {
-      throw new Error(JSON.stringify(e));
+      throw new Error(`${e}`);
     }
 
     const { type, at, from, to } = {
@@ -376,7 +374,7 @@ class Watcher extends EventTarget {
         break;
 
       default: {
-        throw new Error(JSON.stringify(e));
+        throw new Error(`${e}`);
       }
     }
   };
