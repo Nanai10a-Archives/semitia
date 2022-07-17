@@ -2,26 +2,26 @@ import { InternalWatcher, WatchInternalEvent } from "./internal.ts";
 
 type WatchEventParams =
   | {
-      type: "touch";
-      at: string;
-    }
+    type: "touch";
+    at: string;
+  }
   | {
-      type: "new";
-      at: string;
-    }
+    type: "new";
+    at: string;
+  }
   | {
-      type: "move";
-      from: string;
-      to: string;
-    }
+    type: "move";
+    from: string;
+    to: string;
+  }
   | {
-      type: "modify";
-      at: string;
-    }
+    type: "modify";
+    at: string;
+  }
   | {
-      type: "remove";
-      at: string;
-    };
+    type: "remove";
+    at: string;
+  };
 
 export class WatchEvent extends Event {
   public readonly content: Readonly<WatchEventParams>;
