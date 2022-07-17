@@ -37,13 +37,13 @@ example:
 
 then, it's list:
 
-- `Deno.watchFs` : _read_
+- `Deno.watchFs` : _**read**_
 - `Deno.args` : none
-- `Deno.run` : _run_
+- `Deno.run` : _**run**_
 
 ## install
 
-(you can use `-A --unstable` flags, but semitia doesn't need permissions)
+(you can use `-A --unstable` flags, but semitia doesn't need unnecessary permissions)
 
 ```sh
 deno install --allow-read --allow-run --name semitia https://deno.land/x/semitia/cli.ts
