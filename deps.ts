@@ -1,6 +1,7 @@
-const Std = {
-  flags: await import("https://deno.land/std/flags/mod.ts"),
-  path: await import("https://deno.land/std/path/mod.ts"),
-};
+import * as flags from "https://deno.land/std/flags/mod.ts";
+import * as path from "https://deno.land/std/path/mod.ts";
+const Std = { flags, path };
 
-export { Std };
+import * as Cliffy from "https://deno.land/x/cliffy/mod.ts";
+
+export { Cliffy, Std };
