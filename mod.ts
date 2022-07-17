@@ -11,37 +11,37 @@ const std = {
 
 type WatchInternalEventParams =
   | {
-      type: "ignore";
-      reason:
-        | "initial-create"
-        | "with-create"
-        | "momentary-progress"
-        | "initial-modify"
-        | "undecidable-modify"
-        | "linux-access"
-        | "unexpected";
-    }
+    type: "ignore";
+    reason:
+      | "initial-create"
+      | "with-create"
+      | "momentary-progress"
+      | "initial-modify"
+      | "undecidable-modify"
+      | "linux-access"
+      | "unexpected";
+  }
   | {
-      type: "momentary";
-      at: string;
-    }
+    type: "momentary";
+    at: string;
+  }
   | {
-      type: "move";
-      from: string;
-      to: string;
-    }
+    type: "move";
+    from: string;
+    to: string;
+  }
   | {
-      type: "remove";
-      at: string;
-    }
+    type: "remove";
+    at: string;
+  }
   | {
-      type: "create";
-      at: string;
-    }
+    type: "create";
+    at: string;
+  }
   | {
-      type: "modify";
-      at: string;
-    };
+    type: "modify";
+    at: string;
+  };
 
 class WatchInternalEvent extends Event {
   public readonly content: Readonly<WatchInternalEventParams>;
@@ -276,26 +276,26 @@ class InternalWatcher extends EventTarget {
 
 type WatchEventParams =
   | {
-      type: "touch";
-      at: string;
-    }
+    type: "touch";
+    at: string;
+  }
   | {
-      type: "new";
-      at: string;
-    }
+    type: "new";
+    at: string;
+  }
   | {
-      type: "move";
-      from: string;
-      to: string;
-    }
+    type: "move";
+    from: string;
+    to: string;
+  }
   | {
-      type: "modify";
-      at: string;
-    }
+    type: "modify";
+    at: string;
+  }
   | {
-      type: "remove";
-      at: string;
-    };
+    type: "remove";
+    at: string;
+  };
 
 class WatchEvent extends Event {
   public readonly content: Readonly<WatchEventParams>;
