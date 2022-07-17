@@ -1,6 +1,7 @@
 # semitia
 
-for [deno](https://deno.land), thin wrapper of [`Deno.watchFs`](https://doc.deno.land/deno/stable/~/Deno.watchFs)
+for [deno](https://deno.land), thin wrapper of
+[`Deno.watchFs`](https://doc.deno.land/deno/stable/~/Deno.watchFs)
 
 "semitia" ... from [twdne](https://l.thisworddoesnotexist.com/3ZZ2)
 
