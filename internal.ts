@@ -1,6 +1,4 @@
-const std = {
-  path: await import("https://deno.land/std/path/mod.ts"),
-};
+import { Std } from "./deps.ts";
 
 type WatchInternalEventParams =
   | {
@@ -73,7 +71,7 @@ export class InternalWatcher extends EventTarget {
   constructor(path = "", recursive = true) {
     super();
 
-    const target = std.path.resolve(path);
+    const target = Std.path.resolve(path);
 
     this.target = target;
     this.recursive = recursive;

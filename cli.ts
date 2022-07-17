@@ -1,12 +1,9 @@
-const std = {
-  flags: await import("https://deno.land/std/flags/mod.ts"),
-  path: await import("https://deno.land/std/path/mod.ts"),
-};
+import { Std } from "./deps.ts";
 
 import { Watcher, WatchEvent } from "./watcher.ts";
 
 const main = (args: string[]) => {
-  const { _: paths, t, s, a } = std.flags.parse(args);
+  const { _: paths, t, s, a } = Std.flags.parse(args);
 
   let run: (arg: string) => void;
   if (typeof t === "string" && s === undefined) {
@@ -46,7 +43,7 @@ const main = (args: string[]) => {
     if (!all && path.endsWith("~")) return;
 
     const hidden =
-      path.split(std.path.sep).find((s) => s.startsWith(".")) === undefined;
+      path.split(Std.path.sep).find((s) => s.startsWith(".")) === undefined;
     if (!all && !hidden) return;
 
     run(path);
