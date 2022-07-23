@@ -113,6 +113,12 @@ export class InternalWatcher extends EventTarget {
       this.previous = this.current;
     }
 
+    for (const status of Object.values(this.timeout)) {
+      for (const v of Object.values(status)) {
+        clearTimeout(v);
+      }
+    }
+
     this.fswatcher.close();
   };
 
