@@ -3,20 +3,33 @@ const { assertEquals } = Std.testing.asserts;
 
 import { Watcher, WatchEvent } from "./watcher.ts";
 
+const mktmp = () => Deno.makeTempDir({ prefix: "semitia-test-" });
+const rmtmp = (path: string | URL) => Deno.remove(path, { recursive: true });
+
+const asPromise = <F, T extends F = F>(
+  fn: (resolve: (from: F) => void) => unknown,
+) => new Promise<T>((resolve) => fn((from) => resolve(from as T)));
+
+const asWEPromise = (watcher: Watcher, name: string) =>
+  asPromise<Event, WatchEvent>((fn) => watcher.addEventListener(name, fn));
+
+const sleep = (ms: number) => asPromise<void>((fn) => setTimeout(fn, ms));
+
 Deno.test("event: touch (c)", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "semitia-test-" });
+  const dir = await mktmp();
 
   const w = new Watcher(dir);
-  const event = new Promise<WatchEvent>((resolve) =>
-    w.addEventListener("touch", (e) => resolve(e as WatchEvent))
-  );
+  const eventPromise = asWEPromise(w, "touch");
+
   w.watch();
 
   const at = Std.path.join(dir, "touch");
   (await Deno.create(at)).close();
 
-  w.abort();
-  await Deno.remove(dir, { recursive: true });
+  const event = await eventPromise;
 
-  assertEquals((await event).content, { type: "touch", at });
+  w.abort();
+  await rmtmp(dir);
+
+  assertEquals(event.content, { type: "touch", at });
 });
