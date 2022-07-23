@@ -24,7 +24,7 @@ Deno.test("event: touch (c)", async () => {
   w.watch();
 
   const at = Std.path.join(dir, "touch");
-  (await Deno.create(at)).close();
+  await Deno.writeTextFile(at, "");
 
   const event = await eventPromise;
 
