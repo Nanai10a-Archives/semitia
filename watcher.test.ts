@@ -13,8 +13,6 @@ const asPromise = <F, T extends F = F>(
 const asWEPromise = (watcher: Watcher, name: string) =>
   asPromise<Event, WatchEvent>((fn) => watcher.addEventListener(name, fn));
 
-const sleep = (ms: number) => asPromise<void>((fn) => setTimeout(fn, ms));
-
 Deno.test("event: touch (c)", async () => {
   const dir = await mktmp();
 
