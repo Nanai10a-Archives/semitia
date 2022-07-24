@@ -32,4 +32,4 @@ jobs:
         run: deno check $(deno eval 'console.log(...(await import("https://esm.sh/glob")).sync("**/*.ts"))')
 
       - name: test codes
-        run: deno test --allow-read=/tmp --allow-write=/tmp
+        run: deno test --allow-read --allow-write
