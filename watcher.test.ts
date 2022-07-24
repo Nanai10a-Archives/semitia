@@ -32,6 +32,25 @@ Deno.test("event: touch (f) (c)", async () => {
   assertEquals(event.content, { type: "touch", at });
 });
 
+Deno.test("event: touch (d) (c)", async () => {
+  const dir = await mktmp();
+
+  const w = new Watcher(dir);
+  const eventPromise = asWEPromise(w, "touch");
+
+  w.watch();
+
+  const at = Std.path.join(dir, "touch");
+  await Deno.mkdir(at);
+
+  const event = await Std.async.deadline(eventPromise, 100);
+
+  w.abort();
+  await rmtmp(dir);
+
+  assertEquals(event.content, { type: "touch", at });
+});
+
 Deno.test("event: touch (f) (cm)", async () => {
   const dir = await mktmp();
 
@@ -72,6 +91,27 @@ Deno.test("event: move (f) (mm)", async () => {
   assertEquals(event.content, { type: "move", from, to });
 });
 
+Deno.test("event: move (d) (mm)", async () => {
+  const dir = await mktmp();
+
+  const w = new Watcher(dir);
+  const eventPromise = asWEPromise(w, "move");
+
+  w.watch();
+
+  const from = Std.path.join(dir, "move-from");
+  const to = Std.path.join(dir, "move-to");
+  await Deno.mkdir(from);
+  await Std.fs.move(from, to);
+
+  const event = await Std.async.deadline(eventPromise, 100);
+
+  w.abort();
+  await rmtmp(dir);
+
+  assertEquals(event.content, { type: "move", from, to });
+});
+
 Deno.test("event: modify (f) (m)", async () => {
   const dir = await mktmp();
 
@@ -102,6 +142,26 @@ Deno.test("event: remove (f) (r)", async () => {
 
   const at = Std.path.join(dir, "remove");
   await Deno.writeTextFile(at, "");
+  await Deno.remove(at);
+
+  const event = await Std.async.deadline(eventPromise, 100);
+
+  w.abort();
+  await rmtmp(dir);
+
+  assertEquals(event.content, { type: "remove", at });
+});
+
+Deno.test("event: remove (d) (r)", async () => {
+  const dir = await mktmp();
+
+  const w = new Watcher(dir);
+  const eventPromise = asWEPromise(w, "remove");
+
+  w.watch();
+
+  const at = Std.path.join(dir, "remove");
+  await Deno.mkdir(at);
   await Deno.remove(at);
 
   const event = await Std.async.deadline(eventPromise, 100);
