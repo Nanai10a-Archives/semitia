@@ -13,7 +13,7 @@ const asPromise = <F, T extends F = F>(
 const asWEPromise = (watcher: Watcher, name: string) =>
   asPromise<Event, WatchEvent>((fn) => watcher.addEventListener(name, fn));
 
-Deno.test("event: touch (c)", async () => {
+Deno.test("event: touch (f) (c)", async () => {
   const dir = await mktmp();
 
   const w = new Watcher(dir);
@@ -32,7 +32,7 @@ Deno.test("event: touch (c)", async () => {
   assertEquals(event.content, { type: "touch", at });
 });
 
-Deno.test("event: touch (cm)", async () => {
+Deno.test("event: touch (f) (cm)", async () => {
   const dir = await mktmp();
 
   const w = new Watcher(dir);
@@ -51,7 +51,7 @@ Deno.test("event: touch (cm)", async () => {
   assertEquals(event.content, { type: "touch", at });
 });
 
-Deno.test("event: move (mm)", async () => {
+Deno.test("event: move (f) (mm)", async () => {
   const dir = await mktmp();
 
   const w = new Watcher(dir);
@@ -72,7 +72,7 @@ Deno.test("event: move (mm)", async () => {
   assertEquals(event.content, { type: "move", from, to });
 });
 
-Deno.test("event: modify (m)", async () => {
+Deno.test("event: modify (f) (m)", async () => {
   const dir = await mktmp();
 
   const w = new Watcher(dir);
@@ -92,7 +92,7 @@ Deno.test("event: modify (m)", async () => {
   assertEquals(event.content, { type: "modify", at });
 });
 
-Deno.test("event: remove (r)", async () => {
+Deno.test("event: remove (f) (r)", async () => {
   const dir = await mktmp();
 
   const w = new Watcher(dir);
