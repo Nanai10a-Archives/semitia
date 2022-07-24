@@ -24,7 +24,7 @@ Deno.test("event: touch (c)", async () => {
   const at = Std.path.join(dir, "touch");
   await Deno.writeTextFile(at, "");
 
-  const event = await eventPromise;
+  const event = await Std.async.deadline(eventPromise, 100);
 
   w.abort();
   await rmtmp(dir);
@@ -43,7 +43,7 @@ Deno.test("event: touch (cm)", async () => {
   const at = Std.path.join(dir, "touch");
   await Deno.writeTextFile(at, "touch");
 
-  const event = await eventPromise;
+  const event = await Std.async.deadline(eventPromise, 100);
 
   w.abort();
   await rmtmp(dir);
@@ -64,7 +64,7 @@ Deno.test("event: move (mm)", async () => {
   await Deno.writeTextFile(from, "");
   await Std.fs.move(from, to);
 
-  const event = await eventPromise;
+  const event = await Std.async.deadline(eventPromise, 100);
 
   w.abort();
   await rmtmp(dir);
@@ -84,7 +84,7 @@ Deno.test("event: modify (m)", async () => {
   await Deno.writeTextFile(at, "");
   await Deno.writeTextFile(at, "modify");
 
-  const event = await eventPromise;
+  const event = await Std.async.deadline(eventPromise, 100);
 
   w.abort();
   await rmtmp(dir);
@@ -104,7 +104,7 @@ Deno.test("event: remove (r)", async () => {
   await Deno.writeTextFile(at, "");
   await Deno.remove(at);
 
-  const event = await eventPromise;
+  const event = await Std.async.deadline(eventPromise, 100);
 
   w.abort();
   await rmtmp(dir);
