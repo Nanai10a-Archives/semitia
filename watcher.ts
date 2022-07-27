@@ -5,7 +5,7 @@ type WatchEventContent =
   | { type: "modify"; path: string }
   | { type: "remove"; path: string };
 
-type WatchEventType = WatchEventContent["type"];
+export type WatchEventType = WatchEventContent["type"];
 
 export class WatchEvent extends Event {
   readonly path: string;
