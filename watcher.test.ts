@@ -291,13 +291,11 @@ for (const tp of tps) {
     case "verify": {
       Deno.test(testname(tp), async () => {
         const tmpdir = await mktmp();
-        console.log(tmpdir);
 
         const expects = tp.outputs.map(({ type, path }) => ({
           type,
           path: Std.path.join(tmpdir, path),
         }));
-        console.table(expects);
 
         const context: TextContext = {
           path: (path) => Std.path.join(tmpdir, path),
@@ -321,7 +319,6 @@ for (const tp of tps) {
 
         for (const i in eventPsPromises) {
           const params = await timeout(eventPsPromises[i]);
-          console.log(params);
 
           assertEquals(params, expects[i]);
         }
