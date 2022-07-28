@@ -7,7 +7,7 @@ const mktmp = () => Deno.makeTempDir({ prefix: "semitia-test-" });
 const rmtmp = (path: string | URL) => Deno.remove(path, { recursive: true });
 
 const asPromise = <F, T extends F = F>(
-  fn: (resolve: (from: F) => void) => unknown
+  fn: (resolve: (from: F) => void) => unknown,
 ) => new Promise<T>((resolve) => fn((from) => resolve(from as T)));
 
 const asWEPromise = (watcher: Watcher, type: string, timing = 1) =>
@@ -30,7 +30,8 @@ type VerifyTestParam = {
   outputs: { type: WatchEventType; path: string; timing: number }[];
   target: "file" | "directory" | "both";
   inputs: Deno.FsEvent["kind"][];
-  tasks: ((context: TextContext) => unknown)[];
+  prepares: ((context: TextContext) => unknown | Promise<unknown>)[];
+  tasks: ((context: TextContext) => unknown | Promise<unknown>)[];
 };
 
 type CleanupTestParam = { type: "cleanup" };
@@ -140,25 +141,29 @@ for (const tp of tps) {
       Deno.test(testname(tp), async () => {
         const tmpdir = await mktmp();
 
+        const expects = tp.outputs.map(({ type, path }) => ({
+          type,
+          path: Std.path.join(tmpdir, path),
+        }));
+
+        const context: TextContext = {
+          path: (path) => Std.path.join(tmpdir, path),
+        };
+
+        for (const prepare of tp.prepares) {
+          await prepare(context);
+        }
+
         const w = new Watcher(tmpdir);
 
         const eventPsPromises = tp.outputs.map(({ type, timing }) =>
           asPsPromise(asWEPromise(w, type, timing))
         );
 
-        const expects = tp.outputs.map(({ type, path }) => ({
-          type,
-          path: Std.path.join(tmpdir, path),
-        }));
-
         w.watch();
 
-        const context: TextContext = {
-          path: (path) => Std.path.join(tmpdir, path),
-        };
-
         for (const task of tp.tasks) {
-          task(context);
+          await task(context);
         }
 
         for (const i in eventPsPromises) {
