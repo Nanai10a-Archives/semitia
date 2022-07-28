@@ -41,13 +41,157 @@ type TextContext = {
 };
 
 const tps: TestParam[] = [
+  // https://github.com/tommywalkie/Deno.watchFs#add-a-new-empty-file
   {
     type: "verify",
-    action: { kind: "about", content: "create" },
+    action: { kind: "shell", content: "touch" },
     outputs: [{ type: "create", path: "file", timing: 1 }],
     target: "file",
     inputs: ["create"],
+    prepares: [],
     tasks: [(c) => Deno.writeTextFile(c.path("file"), "")],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#add-a-new-file
+  {
+    type: "verify",
+    action: { kind: "about", content: "writes new file" },
+    outputs: [
+      { type: "create", path: "file", timing: 1 },
+      { type: "modify", path: "file", timing: 1 },
+    ],
+    target: "file",
+    inputs: ["create", "modify"],
+    prepares: [],
+    tasks: [(c) => Deno.writeTextFile(c.path("file"), "content")],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#edit-a-file
+  {
+    type: "verify",
+    action: { kind: "about", content: "edit file" },
+    outputs: [{ type: "modify", path: "file", timing: 1 }],
+    target: "file",
+    inputs: ["modify", "modify"],
+    prepares: [(c) => Deno.writeTextFile(c.path("file"), "content")],
+    tasks: [(c) => Deno.writeTextFile(c.path("file"), "modified-content")],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#add-a-new-folder
+  {
+    type: "verify",
+    action: { kind: "shell", content: "mkdir" },
+    outputs: [{ type: "create", path: "dir", timing: 1 }],
+    target: "directory",
+    inputs: ["create"],
+    prepares: [],
+    tasks: [(c) => Deno.mkdir(c.path("dir"), { recursive: true })],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#copy-a-file
+  {
+    type: "verify",
+    action: { kind: "shell", content: "cp" },
+    outputs: [
+      { type: "create", path: "copied-file", timing: 1 },
+      { type: "modify", path: "copied-file", timing: 1 },
+    ],
+    target: "file",
+    inputs: ["create", "modify", "modify"],
+    prepares: [(c) => Deno.writeTextFile(c.path("file"), "content")],
+    tasks: [(c) => Std.fs.copy(c.path("file"), c.path("copied-file"))],
+  },
+
+  // https://github.com/tommywalkie/Deno.watchFs#copy-a-folder
+  {
+    type: "verify",
+    action: { kind: "shell", content: "cp -r" },
+    outputs: [
+      { type: "create", path: "copied-dir", timing: 1 },
+      { type: "create", path: "copied-dir/file", timing: 2 },
+      { type: "modify", path: "copied-dir/file", timing: 1 },
+    ],
+    target: "both",
+    inputs: ["create", "create", "modify", "modify"],
+    prepares: [
+      (c) => Deno.mkdir(c.path("dir"), { recursive: true }),
+      (c) => Deno.writeTextFile(c.path("dir/file"), "content"),
+    ],
+    tasks: [(c) => Std.fs.copy(c.path("dir"), c.path("copied-dir"))],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#move-a-file
+  {
+    type: "verify",
+    action: { kind: "shell", content: "mv" },
+    outputs: [
+      { type: "modify", path: "file", timing: 1 },
+      { type: "modify", path: "moved-file", timing: 2 },
+    ],
+    target: "file",
+    inputs: ["modify", "modify"],
+    prepares: [(c) => Deno.writeTextFile(c.path("file"), "content")],
+    tasks: [(c) => Std.fs.move(c.path("file"), c.path("moved-file"))],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#move-a-folder
+  {
+    type: "verify",
+    action: { kind: "shell", content: "mv" },
+    outputs: [
+      { type: "modify", path: "dir", timing: 1 },
+      { type: "modify", path: "moved-dir", timing: 2 },
+    ],
+    target: "directory",
+    inputs: ["modify", "modify"],
+    prepares: [(c) => Deno.mkdir(c.path("dir"), { recursive: true })],
+    tasks: [(c) => Std.fs.move(c.path("dir"), c.path("moved-dir"))],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#rename-a-file
+  {
+    type: "verify",
+    action: { kind: "about", content: "rename" },
+    outputs: [
+      { type: "modify", path: "file", timing: 1 },
+      { type: "modify", path: "renamed-file", timing: 2 },
+    ],
+    target: "file",
+    inputs: ["modify", "modify"],
+    prepares: [(c) => Deno.writeTextFile(c.path("file"), "content")],
+    tasks: [(c) => Deno.rename(c.path("file"), c.path("renamed-file"))],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#rename-a-folder
+  {
+    type: "verify",
+    action: { kind: "about", content: "rename" },
+    outputs: [
+      { type: "modify", path: "dir", timing: 1 },
+      { type: "modify", path: "renamed-dir", timing: 2 },
+    ],
+    target: "directory",
+    inputs: ["modify", "modify"],
+    prepares: [(c) => Deno.mkdir(c.path("dir"), { recursive: true })],
+    tasks: [(c) => Deno.rename(c.path("dir"), c.path("renamed-dir"))],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#remove-a-file
+  {
+    type: "verify",
+    action: { kind: "shell", content: "rm" },
+    outputs: [{ type: "remove", path: "file", timing: 1 }],
+    target: "file",
+    inputs: ["remove"],
+    prepares: [(c) => Deno.writeTextFile(c.path("file"), "content")],
+    tasks: [(c) => Deno.remove(c.path("file"))],
+  },
+  // https://github.com/tommywalkie/Deno.watchFs#remove-a-folder
+  {
+    type: "verify",
+    action: { kind: "shell", content: "rm -r" },
+    outputs: [
+      { type: "remove", path: "dir/file", timing: 1 },
+      { type: "remove", path: "dir", timing: 2 },
+    ],
+    target: "both",
+    inputs: ["remove", "remove"],
+    prepares: [
+      (c) => Deno.mkdir(c.path("dir"), { recursive: true }),
+      (c) => Deno.writeTextFile(c.path("dir/file"), "content"),
+    ],
+    tasks: [(c) => Deno.remove(c.path("dir"), { recursive: true })],
   },
   {
     type: "cleanup",
@@ -179,16 +323,3 @@ for (const tp of tps) {
     }
   }
 }
-
-// https://github.com/tommywalkie/Deno.watchFs#add-a-new-empty-file
-// https://github.com/tommywalkie/Deno.watchFs#add-a-new-file
-// https://github.com/tommywalkie/Deno.watchFs#edit-a-file
-// https://github.com/tommywalkie/Deno.watchFs#add-a-new-folder
-// https://github.com/tommywalkie/Deno.watchFs#copy-a-file
-// https://github.com/tommywalkie/Deno.watchFs#copy-a-folder
-// https://github.com/tommywalkie/Deno.watchFs#move-a-file
-// https://github.com/tommywalkie/Deno.watchFs#move-a-folder
-// https://github.com/tommywalkie/Deno.watchFs#rename-a-file
-// https://github.com/tommywalkie/Deno.watchFs#rename-a-folder
-// https://github.com/tommywalkie/Deno.watchFs#remove-a-file
-// https://github.com/tommywalkie/Deno.watchFs#remove-a-folder
