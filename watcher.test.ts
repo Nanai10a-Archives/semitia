@@ -5,18 +5,12 @@ import { Watcher, WatchEvent, WatchEventType } from "./watcher.ts";
 
 const randomid = () => Math.random().toString(36).substring(2, 9);
 
-const PREFIX_GLOB = ".test/semitia-test-*";
+const testdir = (name = randomid()) => Std.path.join(Deno.cwd(), ".test", name);
 
-const testdir = () =>
-  Std.path.join(Deno.cwd(), PREFIX_GLOB.replace("*", randomid()));
+const mktmp = async (dir = testdir()) =>
+  void (await Deno.mkdir(dir, { recursive: true })) ?? dir;
 
-const mktmp = () => {
-  const tmpdir = testdir();
-  Deno.mkdir(tmpdir, { recursive: true });
-  return tmpdir;
-};
-
-const rmtmp = (path: string | URL) => Deno.remove(path, { recursive: true });
+const rmtmp = async () => await Deno.remove(testdir(""), { recursive: true });
 
 const asPromise = <F, T extends F = F>(
   fn: (resolve: (from: F) => void) => unknown,
@@ -276,13 +270,7 @@ for (const tp of tps) {
   switch (tp.type) {
     case "cleanup": {
       Deno.test(testname(tp), async () => {
-        const glob = Std.path.join(Deno.cwd(), PREFIX_GLOB);
-
-        for await (const e of Std.fs.expandGlob(glob)) {
-          if (e.isDirectory) {
-            rmtmp(e.path);
-          }
-        }
+        await rmtmp();
       });
 
       continue;
