@@ -3,7 +3,19 @@ const { assertEquals } = Std.testing.asserts;
 
 import { Watcher, WatchEvent, WatchEventType } from "./watcher.ts";
 
-const mktmp = () => Deno.makeTempDir({ prefix: "semitia-test-" });
+const randomid = () => Math.random().toString(36).substring(2, 9);
+
+const PREFIX_GLOB = ".test/semitia-test-*";
+
+const testdir = () =>
+  Std.path.join(Deno.cwd(), PREFIX_GLOB.replace("*", randomid()));
+
+const mktmp = () => {
+  const tmpdir = testdir();
+  Deno.mkdir(tmpdir, { recursive: true });
+  return tmpdir;
+};
+
 const rmtmp = (path: string | URL) => Deno.remove(path, { recursive: true });
 
 const asPromise = <F, T extends F = F>(
@@ -264,12 +276,7 @@ for (const tp of tps) {
   switch (tp.type) {
     case "cleanup": {
       Deno.test(testname(tp), async () => {
-        const dir = (await mktmp())
-          .split(Std.path.sep)
-          .slice(0, -1)
-          .join(Std.path.sep);
-
-        const glob = Std.path.join(dir, "semitia-test-*");
+        const glob = Std.path.join(Deno.cwd(), PREFIX_GLOB);
 
         for await (const e of Std.fs.expandGlob(glob)) {
           if (e.isDirectory) {
