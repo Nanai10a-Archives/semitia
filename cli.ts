@@ -38,14 +38,14 @@ const main = async (args: string[]) => {
   const prehandle = (event: Event) => {
     if (!(event instanceof WatchEvent)) return;
 
-    switch (event.content.type) {
+    switch (event.type) {
       case "touch":
       case "new":
       case "modify":
-        return handle(event.content.at);
+        return handle(event.path);
 
       case "move":
-        return handle(event.content.to);
+        return handle(event.path);
     }
   };
 
