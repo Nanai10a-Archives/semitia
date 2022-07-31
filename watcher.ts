@@ -47,6 +47,7 @@ export class Watcher extends EventTarget {
     let event;
     while ((event = await this.maybeEmit())) {
       if (event.done === true) break;
+      this.debug(event.value);
       this.handle(event.value);
     }
 
@@ -55,6 +56,19 @@ export class Watcher extends EventTarget {
 
   private readonly maybeEmit = () =>
     Promise.race([this.emitter.next(), this.signal]);
+
+  private readonly debug = ({ kind, paths }: Deno.FsEvent) => {
+    console.log("event emitted:");
+
+    console.table({
+      kind,
+      path0: paths[0],
+      path1: paths[1],
+      pathl: paths.length,
+    });
+
+    console.log();
+  };
 
   private readonly cleanup = () => {
     this.fswatcher.close();
