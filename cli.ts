@@ -8,6 +8,8 @@ const main = async (args: string[]) => {
     .name("semitia")
     .version(VERSION)
     .description("thin wrapper of Deno.watchFs.")
+    .arguments("[dirs...:string]")
+    .group("emitter customizes")
     .option("-t, --task <task:string>", "executes deno task.", {
       collect: true,
       conflicts: ["shell"],
@@ -19,7 +21,10 @@ const main = async (args: string[]) => {
       required: true,
     })
     .option("-a, --all", "unignore `.dot` and `temp~` files.")
-    .arguments("[dirs...:string]")
+    .group("accepting events")
+    .option("-c --create", "on created")
+    .option("-m --modify", "on written")
+    .option("-r --remove", "on removed")
     .parse(args);
 
   const paths = [...(result.args?.[0] ?? [""]), ...result.literal];
@@ -35,18 +40,12 @@ const main = async (args: string[]) => {
     throw new Error("non-provided executions.");
   }
 
+  if (!opts.create && !opts.modify && !opts.remove) {
+    throw new Error("non-provided acceptions");
+  }
+
   const prehandle = (event: Event) => {
-    if (!(event instanceof WatchEvent)) return;
-
-    switch (event.type) {
-      case "touch":
-      case "new":
-      case "modify":
-        return handle(event.path);
-
-      case "move":
-        return handle(event.path);
-    }
+    if (event instanceof WatchEvent) handle(event.path);
   };
 
   const handle = (path: string) => {
@@ -59,13 +58,18 @@ const main = async (args: string[]) => {
     Deno.run({ cmd: [...execute, path] });
   };
 
+  const events = {
+    create: opts.create,
+    modify: opts.modify,
+    remove: opts.remove,
+  };
+
   const watchers = paths.map((s) => new Watcher(s));
 
   for (const w of watchers) {
-    w.addEventListener("touch", prehandle);
-    w.addEventListener("new", prehandle);
-    w.addEventListener("move", prehandle);
-    w.addEventListener("modify", prehandle);
+    for (const [e, c] of Object.entries(events)) {
+      if (c) w.addEventListener(e, prehandle);
+    }
   }
 
   return Promise.all(watchers.map((w) => w.watch()));
