@@ -10,14 +10,14 @@ for [deno](https://deno.land), thin wrapper of
 minimal usage:
 
 ```sh
-deno run --allow-read=$PWD --allow-run https://deno.land/x/semitia/cli.ts -s echo
+deno run --allow-read=$PWD --allow-run https://deno.land/x/semitia/cli.ts -ms echo
 ```
 
 ...then if changed files, shows full paths of file.\
 example:
 
 ```sh
-$ deno run --allow-read=$PWD --allow-run https://deno.land/x/semitia/cli.ts -s echo
+$ deno run --allow-read=$PWD --allow-run https://deno.land/x/semitia/cli.ts -ms echo
 # write some changes to README.md, then ...
 /home/user/semitia/README.md
 ```
@@ -25,7 +25,7 @@ $ deno run --allow-read=$PWD --allow-run https://deno.land/x/semitia/cli.ts -s e
 ...but usually will be able to use this:
 
 ```sh
-$ deno run -A https://deno.land/x/semitia/cli.ts -s echo
+$ deno run -A https://deno.land/x/semitia/cli.ts -ms echo
 ```
 
 ## permission
