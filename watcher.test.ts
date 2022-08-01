@@ -285,16 +285,6 @@ for (const tp of tps) {
           path: Std.path.join(tmpdir, path),
         }));
 
-        const _expects = tp.outputs.map(({ type, path, timing }) => ({
-          type,
-          path: Std.path.join(tmpdir, path),
-          timing,
-        }));
-
-        console.log("expects: ");
-        console.table(_expects);
-        console.log();
-
         const context: TextContext = {
           path: (path) => Std.path.join(tmpdir, path),
         };
@@ -311,13 +301,9 @@ for (const tp of tps) {
 
         w.watch();
 
-        console.log("processing tasks...");
-
         for (const task of tp.tasks) {
           await task(context);
         }
-
-        console.log("...completed");
 
         for (const i in eventPsPromises) {
           const params = await timeout(eventPsPromises[i]);
